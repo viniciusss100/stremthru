@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,12 @@ type Query struct {
 	APIKey        string
 
 	IMDBId string
+}
+
+func (query Query) Clone() Query {
+	q := query
+	q.Categories = slices.Clone(query.Categories)
+	return q
 }
 
 func (query Query) HasTVShows() bool {

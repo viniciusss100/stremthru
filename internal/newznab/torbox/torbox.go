@@ -55,6 +55,10 @@ func (i *Indexer) GetId() string {
 	return string(store.StoreNameTorBox)
 }
 
+func (i *Indexer) GetCaps() (znab.Caps, error) {
+	return *getCaps(), nil
+}
+
 func (i *Indexer) NewSearchQuery(fn func(caps *znab.Caps) newznab_client.Function) (*newznab_client.Query, error) {
 	caps := getCaps()
 	return newznab_client.NewQuery(caps).SetT(fn(caps)), nil

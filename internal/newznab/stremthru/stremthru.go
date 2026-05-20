@@ -40,6 +40,10 @@ func (i *Indexer) GetId() string {
 	return "stremthru"
 }
 
+func (i *Indexer) GetCaps() (znab.Caps, error) {
+	return *getCaps(), nil
+}
+
 func (i *Indexer) isValidAPIKey() bool {
 	password := config.Auth.GetPassword(i.user)
 	return password != "" && password == i.pass

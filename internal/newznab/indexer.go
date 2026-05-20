@@ -66,7 +66,7 @@ func (sti stremThruIndexer) Search(q Query) ([]FeedItem, error) {
 			continue
 		}
 		wg.Add(1)
-		go func(idxr *newznab_indexer.NewznabIndexer) {
+		go func(idxr *newznab_indexer.NewznabIndexer, q Query) {
 			defer wg.Done()
 
 			rl, err := idxr.GetRateLimiter()
@@ -99,11 +99,21 @@ func (sti stremThruIndexer) Search(q Query) ([]FeedItem, error) {
 			default:
 				headers = config.Newz.IndexerRequestHeader.Query.Get(config.NewzIndexerRequestQueryTypeAny)
 			}
-			query := q.ToValues()
+			caps, err := client.GetCaps()
+			if err != nil {
+				resultCh <- searchResult{indexer: idxr, err: fmt.Errorf("failed to get capabilities: %w", err)}
+				return
+			}
+			adjQ, err := adjustQueryForCaps(q, caps)
+			if err != nil {
+				resultCh <- searchResult{indexer: idxr, err: err}
+				return
+			}
+			query := adjQ.ToValues()
 			query.Set("apikey", apikey)
 			items, err := newznabcache.Search.Do(client, query, headers, log)
 			resultCh <- searchResult{indexer: idxr, items: items, err: err}
-		}(idxr)
+		}(idxr, q.Clone())
 	}
 
 	go func() {

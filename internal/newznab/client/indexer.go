@@ -64,6 +64,7 @@ func (n *Newz) GetHash() string {
 
 type Indexer interface {
 	GetId() string
+	GetCaps() (Caps, error)
 	NewSearchQuery(fn func(caps *znab.Caps) Function) (*Query, error)
 	Search(query url.Values, headers http.Header) ([]Newz, error)
 }
