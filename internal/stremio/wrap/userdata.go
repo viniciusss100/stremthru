@@ -81,8 +81,11 @@ type UserData struct {
 	TemplateId string                                 `json:"template,omitempty"`
 	template   stremio_transformer.StreamTemplateBlob `json:"-"`
 
-	Sort   string `json:"sort,omitempty"`
-	Filter string `json:"filter,omitempty"`
+	Sort string `json:"sort,omitempty"`
+
+	Filter     string                            `json:"filter,omitempty"`
+	filter     *stremio_transformer.StreamFilter `json:"-"`
+	filter_err error                             `json:"-"`
 
 	RPDBAPIKey       string `json:"rpdb_akey,omitempty"`
 	TopPostersAPIKey string `json:"top_posters_akey,omitempty"`
@@ -138,6 +141,16 @@ func (ud *UserData) SetEncoded(encoded string) {
 
 func (ud *UserData) Ptr() *UserData {
 	return ud
+}
+
+func (ud *UserData) GetFilter() (*stremio_transformer.StreamFilter, error) {
+	if ud.Filter == "" {
+		return nil, nil
+	}
+	if ud.filter == nil && ud.filter_err == nil {
+		ud.filter, ud.filter_err = stremio_transformer.StreamFilterBlob(ud.Filter).Parse()
+	}
+	return ud.filter, ud.filter_err
 }
 
 func verifyTopPostersAPIKey(apiKey string) error {

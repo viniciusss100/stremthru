@@ -29,6 +29,12 @@ var lazyPullTorz = config.Stremio.Torz.LazyPull
 func (ud UserData) fetchStream(ctx *Ctx, r *http.Request, rType, id string) (*stremio.StreamHandlerResponse, error) {
 	log := ctx.Log
 
+	filter, filter_err := ud.GetFilter()
+	if filter_err != nil {
+		log.Warn("failed to parse filter expression", "error", filter_err)
+		return nil, shared.ErrorBadRequest(r, "invalid filter expression: "+filter_err.Error())
+	}
+
 	eud := ud.GetEncoded()
 
 	stremId := strings.TrimSuffix(id, ".json")
@@ -193,14 +199,7 @@ func (ud UserData) fetchStream(ctx *Ctx, r *http.Request, rType, id string) (*st
 		allStreams = dedupeStreams(allStreams)
 	}
 
-	if ud.Filter != "" {
-		filter, err := stremio_transformer.StreamFilterBlob(ud.Filter).Parse()
-		if err == nil {
-			allStreams = filterStreams(allStreams, filter)
-		} else {
-			log.Warn("failed to parse filter expression", "error", err)
-		}
-	}
+	allStreams = filterStreams(allStreams, filter)
 
 	if template != nil {
 		stremio_transformer.SortStreams(allStreams, ud.Sort)
@@ -335,6 +334,9 @@ func (ud UserData) fetchStream(ctx *Ctx, r *http.Request, rType, id string) (*st
 }
 
 func filterStreams(streams []WrappedStream, filter *stremio_transformer.StreamFilter) []WrappedStream {
+	if filter == nil || filter.IsEmpty() {
+		return streams
+	}
 	result := make([]WrappedStream, 0, len(streams))
 	for i := range streams {
 		stream := &streams[i]

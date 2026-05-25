@@ -681,6 +681,13 @@ func handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filter, filter_err := ud.GetFilter()
+	if filter_err != nil {
+		log.Warn("failed to parse filter expression", "error", filter_err)
+		shared.ErrorBadRequest(r, "invalid filter expression: "+filter_err.Error()).Send(w, r)
+		return
+	}
+
 	eud := ud.GetEncoded()
 
 	pulledHashes := []string{}
@@ -799,14 +806,7 @@ func handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ud.Filter != "" {
-		filter, err := stremio_transformer.StreamFilterBlob(ud.Filter).Parse()
-		if err == nil {
-			wrappedStreams = filterStreams(wrappedStreams, filter)
-		} else {
-			log.Warn("failed to parse filter expression", "error", err)
-		}
-	}
+	wrappedStreams = filterStreams(wrappedStreams, filter)
 
 	stremio_transformer.SortStreams(wrappedStreams, ud.Sort)
 
@@ -909,6 +909,9 @@ func handleStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func filterStreams(streams []WrappedStream, filter *stremio_transformer.StreamFilter) []WrappedStream {
+	if filter == nil || filter.IsEmpty() {
+		return streams
+	}
 	result := make([]WrappedStream, 0, len(streams))
 	for i := range streams {
 		stream := &streams[i]

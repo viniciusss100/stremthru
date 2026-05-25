@@ -79,6 +79,10 @@ func getTemplateData(ud *UserData, w http.ResponseWriter, r *http.Request) *Temp
 		TemplateIds:  []string{},
 	}
 
+	if _, err := ud.GetFilter(); err != nil {
+		td.FilterConfig.Error = err.Error()
+	}
+
 	if cookie, err := stremio_shared.GetAdminCookieValue(w, r); err == nil && !cookie.IsExpired {
 		td.IsAuthed = config.Auth.GetPassword(cookie.User()) == cookie.Pass()
 	}
@@ -302,6 +306,9 @@ func (td *TemplateData) HasFieldError() bool {
 		if td.Configs[i].Error != "" {
 			return true
 		}
+	}
+	if td.FilterConfig.Error != "" {
+		return true
 	}
 	if td.RPDBAPIKey.Error != "" {
 		return true

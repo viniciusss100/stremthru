@@ -9,6 +9,7 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/server"
 	"github.com/MunifTanjim/stremthru/internal/shared"
 	stremio_shared "github.com/MunifTanjim/stremthru/internal/stremio/shared"
+	stremio_transformer "github.com/MunifTanjim/stremthru/internal/stremio/transformer"
 	stremio_userdata "github.com/MunifTanjim/stremthru/internal/stremio/userdata"
 	torznab_client "github.com/MunifTanjim/stremthru/internal/torznab/client"
 	"github.com/MunifTanjim/stremthru/internal/util"
@@ -18,9 +19,13 @@ type UserData struct {
 	stremio_userdata.UserDataIndexers
 	IncludeUncachedPrivate bool `json:"unc_prvt,omitempty"`
 	stremio_userdata.UserDataStores
-	CachedOnly bool   `json:"cached,omitempty"`
-	Sort       string `json:"sort,omitempty"`
-	Filter     string `json:"filter,omitempty"`
+	CachedOnly bool `json:"cached,omitempty"`
+
+	Sort string `json:"sort,omitempty"`
+
+	Filter     string                            `json:"filter,omitempty"`
+	filter     *stremio_transformer.StreamFilter `json:"-"`
+	filter_err error                             `json:"-"`
 
 	encoded string `json:"-"` // correctly configured
 }
@@ -55,6 +60,16 @@ func (ud *UserData) SetEncoded(encoded string) {
 
 func (ud *UserData) Ptr() *UserData {
 	return ud
+}
+
+func (ud *UserData) GetFilter() (*stremio_transformer.StreamFilter, error) {
+	if ud.Filter == "" {
+		return nil, nil
+	}
+	if ud.filter == nil && ud.filter_err == nil {
+		ud.filter, ud.filter_err = stremio_transformer.StreamFilterBlob(ud.Filter).Parse()
+	}
+	return ud.filter, ud.filter_err
 }
 
 type userDataError struct {

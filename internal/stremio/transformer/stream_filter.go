@@ -115,7 +115,6 @@ func (sfb StreamFilterBlob) Parse() (*StreamFilter, error) {
 		string(sfb),
 		expr.Env(&StreamExtractorResult{}),
 		expr.AsBool(),
-		expr.AllowUndefinedVariables(),
 		expr.Function("__Resolution__", func(val ...any) (any, error) {
 			return Resolution(val[0].(string)), nil
 		}, new(func(string) Resolution)),
@@ -135,8 +134,12 @@ func (sfb StreamFilterBlob) Parse() (*StreamFilter, error) {
 	return sf, nil
 }
 
+func (sf *StreamFilter) IsEmpty() bool {
+	return sf == nil || sf.program == nil
+}
+
 func (sf *StreamFilter) Match(r *StreamExtractorResult) bool {
-	if sf == nil || sf.program == nil || r == nil {
+	if sf.IsEmpty() || r == nil {
 		return true
 	}
 
