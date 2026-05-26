@@ -5,9 +5,11 @@ import { api } from "@/lib/api";
 export type NewznabIndexer = {
   created_at: string;
   disabled: boolean;
+  hostnames?: null | string[];
   id: number;
   name: string;
   rate_limit_config_id: null | string;
+  tunnel: null | string;
   type: NewznabIndexerType;
   updated_at: string;
   url: string;
@@ -17,6 +19,7 @@ type CreateNewznabIndexerParams = {
   api_key?: string;
   name: string;
   rate_limit_config_id: null | string;
+  tunnel?: null | string;
   url: string;
 };
 
@@ -26,6 +29,7 @@ type UpdateNewznabIndexerParams = {
   api_key?: string;
   name?: string;
   rate_limit_config_id: null | string;
+  tunnel?: null | string;
 };
 
 export function useNewznabIndexerMutation() {

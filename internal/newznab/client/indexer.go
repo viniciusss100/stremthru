@@ -63,6 +63,7 @@ func (n *Newz) GetHash() string {
 
 type Indexer interface {
 	GetId() string
+	GetHTTPClient() *http.Client
 	GetCaps() (Caps, error)
 	NewSearchQuery(fn func(caps *znab.Caps) Function) (*Query, error)
 	Search(query url.Values, headers http.Header) ([]Newz, int64, error)
@@ -190,4 +191,8 @@ func (c *Client) Search(query url.Values, headers http.Header) ([]Newz, int64, e
 
 func (c *Client) GetId() string {
 	return c.BaseURL.Host
+}
+
+func (c *Client) GetHTTPClient() *http.Client {
+	return c.HTTPClient
 }

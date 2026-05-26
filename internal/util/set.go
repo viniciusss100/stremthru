@@ -6,6 +6,10 @@ type Set[T comparable] struct {
 	m map[T]struct{}
 }
 
+func (s *Set[T]) Size() int {
+	return len(s.m)
+}
+
 func (s *Set[T]) Add(v T) {
 	s.m[v] = struct{}{}
 }
@@ -30,7 +34,7 @@ func (s *Set[T]) Seq() iter.Seq[T] {
 }
 
 func (s *Set[T]) ToSlice() []T {
-	result := make([]T, 0, len(s.m))
+	result := make([]T, 0, s.Size())
 	for key := range s.m {
 		result = append(result, key)
 	}

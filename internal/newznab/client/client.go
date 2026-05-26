@@ -16,6 +16,10 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/znab"
 )
 
+var (
+	_ Indexer = (*Client)(nil)
+)
+
 type ClientConfig struct {
 	BaseURL    string
 	HTTPClient *http.Client
@@ -141,7 +145,9 @@ func (c *Client) Request(method, path string, params request.Context, v request.
 			error.UpstreamCause = rerr
 		} else {
 			error.Cause = err
-			error.StatusCode = res.StatusCode
+			if res != nil {
+				error.StatusCode = res.StatusCode
+			}
 		}
 		error.InjectReq(req)
 		return res, error

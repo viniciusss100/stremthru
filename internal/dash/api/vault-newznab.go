@@ -11,20 +11,27 @@ import (
 )
 
 type NewznabIndexerResponse struct {
-	Id                int64   `json:"id"`
-	Type              string  `json:"type"`
-	Name              string  `json:"name"`
-	URL               string  `json:"url"`
-	RateLimitConfigId *string `json:"rate_limit_config_id"`
-	Disabled          bool    `json:"disabled"`
-	CreatedAt         string  `json:"created_at"`
-	UpdatedAt         string  `json:"updated_at"`
+	Id                int64    `json:"id"`
+	Type              string   `json:"type"`
+	Name              string   `json:"name"`
+	URL               string   `json:"url"`
+	RateLimitConfigId *string  `json:"rate_limit_config_id"`
+	Disabled          bool     `json:"disabled"`
+	Tunnel            *string  `json:"tunnel"`
+	Hostnames         []string `json:"hostnames"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
-func toNewznabIndexerResponse(item *newznab_indexer.NewznabIndexer) NewznabIndexerResponse {
+func toNewznabIndexerResponse(item *newznab_indexer.NewznabIndexer, hostnames []string) NewznabIndexerResponse {
 	var rateLimitConfigId *string
 	if item.RateLimitConfigId.Valid {
 		rateLimitConfigId = &item.RateLimitConfigId.String
+	}
+
+	var tunnel *string
+	if item.Tunnel.Valid {
+		tunnel = &item.Tunnel.String
 	}
 
 	return NewznabIndexerResponse{
@@ -34,6 +41,8 @@ func toNewznabIndexerResponse(item *newznab_indexer.NewznabIndexer) NewznabIndex
 		URL:               item.URL,
 		RateLimitConfigId: rateLimitConfigId,
 		Disabled:          item.Disabled,
+		Tunnel:            tunnel,
+		Hostnames:         hostnames,
 		CreatedAt:         item.CAt.Format(time.RFC3339),
 		UpdatedAt:         item.UAt.Format(time.RFC3339),
 	}
@@ -46,9 +55,11 @@ func handleGetNewznabIndexers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hostnameMap := newznab_indexer.GetHostnamesByIndexerIDMap()
+
 	data := make([]NewznabIndexerResponse, len(items))
 	for i := range items {
-		data[i] = toNewznabIndexerResponse(&items[i])
+		data[i] = toNewznabIndexerResponse(&items[i], hostnameMap[items[i].Id])
 	}
 
 	SendData(w, r, 200, data)
@@ -59,6 +70,7 @@ type CreateNewznabIndexerRequest struct {
 	APIKey            string  `json:"api_key"`
 	Name              string  `json:"name"`
 	RateLimitConfigId *string `json:"rate_limit_config_id"`
+	Tunnel            *string `json:"tunnel"`
 }
 
 func handleCreateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +123,20 @@ func handleCreateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if request.Tunnel != nil && *request.Tunnel != "" {
+		if err := newznab_indexer.ValidateTunnel(*request.Tunnel); err != nil {
+			ErrorBadRequest(r).Append(Error{
+				Location: "tunnel",
+				Message:  err.Error(),
+			}).Send(w, r)
+			return
+		}
+		indexer.Tunnel = sql.NullString{
+			String: *request.Tunnel,
+			Valid:  true,
+		}
+	}
+
 	if err := indexer.Validate(); err != nil {
 		ErrorBadRequest(r).WithMessage("Invalid Newznab URL or API key").WithCause(err).Send(w, r)
 		return
@@ -121,7 +147,7 @@ func handleCreateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendData(w, r, 201, toNewznabIndexerResponse(indexer))
+	SendData(w, r, 201, toNewznabIndexerResponse(indexer, nil))
 }
 
 func handleGetNewznabIndexer(w http.ResponseWriter, r *http.Request) {
@@ -142,13 +168,14 @@ func handleGetNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendData(w, r, 200, toNewznabIndexerResponse(indexer))
+	SendData(w, r, 200, toNewznabIndexerResponse(indexer, nil))
 }
 
 type UpdateNewznabIndexerRequest struct {
 	APIKey            string  `json:"api_key"`
 	Name              string  `json:"name,omitempty"`
 	RateLimitConfigId *string `json:"rate_limit_config_id"`
+	Tunnel            *string `json:"tunnel"`
 }
 
 func handleUpdateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
@@ -204,8 +231,26 @@ func handleUpdateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if request.Tunnel != nil {
+		if *request.Tunnel == "" {
+			indexer.Tunnel = sql.NullString{Valid: false}
+		} else {
+			if err := newznab_indexer.ValidateTunnel(*request.Tunnel); err != nil {
+				ErrorBadRequest(r).Append(Error{
+					Location: "tunnel",
+					Message:  err.Error(),
+				}).Send(w, r)
+				return
+			}
+			indexer.Tunnel = sql.NullString{
+				String: *request.Tunnel,
+				Valid:  true,
+			}
+		}
+	}
+
 	if err := indexer.Validate(); err != nil {
-		ErrorBadRequest(r).WithMessage("Invalid Newznab API key").Send(w, r)
+		ErrorBadRequest(r).WithMessage("Connection Failure: "+err.Error()).Send(w, r)
 		return
 	}
 
@@ -214,7 +259,7 @@ func handleUpdateNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendData(w, r, 200, toNewznabIndexerResponse(indexer))
+	SendData(w, r, 200, toNewznabIndexerResponse(indexer, nil))
 }
 
 func handleDeleteNewznabIndexer(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +311,7 @@ func handleTestNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendData(w, r, 200, toNewznabIndexerResponse(indexer))
+	SendData(w, r, 200, toNewznabIndexerResponse(indexer, nil))
 }
 
 func handleToggleNewznabIndexer(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +339,7 @@ func handleToggleNewznabIndexer(w http.ResponseWriter, r *http.Request) {
 
 	indexer.Disabled = !indexer.Disabled
 
-	SendData(w, r, 200, toNewznabIndexerResponse(indexer))
+	SendData(w, r, 200, toNewznabIndexerResponse(indexer, nil))
 }
 
 func AddVaultNewznabEndpoints(router *http.ServeMux) {

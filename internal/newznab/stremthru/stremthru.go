@@ -40,6 +40,10 @@ func (i *Indexer) GetId() string {
 	return "stremthru"
 }
 
+func (i *Indexer) GetHTTPClient() *http.Client {
+	return nil
+}
+
 func (i *Indexer) GetCaps() (znab.Caps, error) {
 	return *getCaps(), nil
 }

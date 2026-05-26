@@ -14,6 +14,7 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/db"
 	"github.com/MunifTanjim/stremthru/internal/endpoint"
 	"github.com/MunifTanjim/stremthru/internal/job"
+	newznab_indexer "github.com/MunifTanjim/stremthru/internal/newznab/indexer"
 	newznab_stats "github.com/MunifTanjim/stremthru/internal/newznab/stats"
 	"github.com/MunifTanjim/stremthru/internal/posthog"
 	"github.com/MunifTanjim/stremthru/internal/shared"
@@ -35,6 +36,10 @@ func main() {
 	defer db.Close()
 	db.Ping()
 	RunSchemaMigration(database.URI, database)
+
+	if err := newznab_indexer.LoadIndexerIDByHostnameMap(); err != nil {
+		log.Fatalf("failed to load newznab indexer id by hostname map: %v\n", err)
+	}
 
 	defer cache.ClosePersistentCaches()
 	defer usenetmanager.Close()

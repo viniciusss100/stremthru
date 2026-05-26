@@ -55,6 +55,10 @@ func (i *Indexer) GetId() string {
 	return string(store.StoreNameTorBox)
 }
 
+func (i *Indexer) GetHTTPClient() *http.Client {
+	return i.api.HTTPClient
+}
+
 func (i *Indexer) GetCaps() (znab.Caps, error) {
 	return *getCaps(), nil
 }

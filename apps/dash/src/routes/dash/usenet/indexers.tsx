@@ -88,6 +88,34 @@ const columns: ColumnDef<NewznabIndexer>[] = [
     },
     header: "URL",
   }),
+  col.accessor("hostnames", {
+    cell: ({ getValue }) => {
+      const hostnames = getValue();
+      if (!hostnames?.length) return "-";
+      const [first, ...rest] = hostnames;
+      if (!rest.length) {
+        return <span className="font-mono text-xs">{first}</span>;
+      }
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="font-mono text-xs">
+              {first}{" "}
+              <span className="text-muted-foreground">+{rest.length}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="flex flex-col gap-0.5 font-mono text-xs">
+              {hostnames.map((h) => (
+                <span key={h}>{h}</span>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    },
+    header: "Hostnames",
+  }),
   col.accessor("rate_limit_config_id", {
     cell: ({ getValue }) => {
       return <RateLimitConfigName id={getValue()} />;
@@ -110,6 +138,18 @@ const columns: ColumnDef<NewznabIndexer>[] = [
       );
     },
     header: "Status",
+  }),
+  col.accessor("tunnel", {
+    cell: ({ getValue }) => {
+      const value = getValue();
+      if (!value) return "Auto";
+      if (value === "true") return "Forced";
+      if (value === "false") return "None";
+      return (
+        <span className="max-w-md truncate font-mono text-xs">{value}</span>
+      );
+    },
+    header: "Tunnel",
   }),
   col.accessor("updated_at", {
     cell: ({ getValue }) => {
@@ -275,6 +315,12 @@ function NewznabIndexerFormSheet({
     }
   }, [editItem]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setEditItem(null);
+    }
+  }, [isOpen, setEditItem]);
+
   const { create, update } = useNewznabIndexerMutation();
 
   const defaultValues = useMemo(
@@ -282,20 +328,28 @@ function NewznabIndexerFormSheet({
       api_key: "",
       name: editItem?.name ?? "",
       rate_limit_config_id: editItem?.rate_limit_config_id ?? "",
+      tunnel: editItem?.tunnel ?? "",
       url: editItem?.url ?? "",
     }),
-    [editItem?.name, editItem?.rate_limit_config_id, editItem?.url],
+    [
+      editItem?.name,
+      editItem?.rate_limit_config_id,
+      editItem?.tunnel,
+      editItem?.url,
+    ],
   );
 
   const form = useAppForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      const tunnel = value.tunnel.trim() || null;
       if (editItem) {
         await update.mutateAsync({
           api_key: value.api_key,
           id: editItem.id,
           name: value.name,
           rate_limit_config_id: value.rate_limit_config_id || null,
+          tunnel,
         });
         toast.success("Updated successfully!");
       } else {
@@ -303,6 +357,7 @@ function NewznabIndexerFormSheet({
           api_key: value.api_key,
           name: value.name,
           rate_limit_config_id: value.rate_limit_config_id || null,
+          tunnel,
           url: value.url,
         });
         toast.success("Created successfully!");
@@ -319,8 +374,10 @@ function NewznabIndexerFormSheet({
     <Sheet onOpenChange={setIsOpen} open={isOpen}>
       <SheetTrigger asChild>
         <Button
-          onClick={() => {
+          onClick={(e) => {
+            e.preventDefault();
             setEditItem(null);
+            setIsOpen(true);
           }}
           size="sm"
         >
@@ -360,6 +417,14 @@ function NewznabIndexerFormSheet({
                   <field.Select
                     label="Rate Limit Config"
                     options={rateLimitConfigOptions}
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="tunnel">
+                {(field) => (
+                  <field.Input
+                    label="Tunnel"
+                    placeholder="true | false | http(s)://... | socks5(h)://..."
                   />
                 )}
               </form.AppField>

@@ -134,10 +134,17 @@ func (sti stremThruIndexer) Search(q Query) ([]FeedItem, error) {
 		if result.err != nil {
 			continue
 		}
+		hostnames := util.NewSet[string]()
 		for _, item := range result.items {
 			feedItem := convertToFeedItem(item, result.indexer)
 			allItems = append(allItems, feedItem)
+			if u, err := url.Parse(item.DownloadLink); err == nil {
+				if h := u.Hostname(); h != "" {
+					hostnames.Add(h)
+				}
+			}
 		}
+		newznab_indexer.RecordHostnames(result.indexer.Id, hostnames)
 	}
 
 	if q.Offset >= len(allItems) {

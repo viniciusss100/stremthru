@@ -330,7 +330,7 @@ func GetHTTPClient(tunnelType TunnelType) *http.Client {
 	}
 }
 
-func getHTTPClientWithProxy(proxyUrl *url.URL) *http.Client {
+func GetHTTPClientWithProxy(proxyUrl *url.URL) *http.Client {
 	transport := DefaultHTTPTransport.Clone()
 	transport.Proxy = func(r *http.Request) (*url.URL, error) {
 		return proxyUrl, nil
@@ -412,7 +412,7 @@ func (ipr *IPResolver) getIpFrom(client *http.Client, checker string) (string, e
 	return ip, nil
 }
 
-func (ipr *IPResolver) getIp(client *http.Client) (string, error) {
+func (ipr *IPResolver) GetIP(client *http.Client) (string, error) {
 	errs := []error{}
 	for _, checker := range ipr.checkers {
 		ip, err := ipr.getIpFrom(client, checker)
@@ -432,7 +432,7 @@ func (ipr *IPResolver) GetMachineIP() string {
 	if ipr.machineIP == "" {
 		client := GetHTTPClient(TUNNEL_TYPE_NONE)
 		client.Timeout = 30 * time.Second
-		ip, err := ipr.getIp(client)
+		ip, err := ipr.GetIP(client)
 		if err != nil {
 			log.Panicf("Failed to detect Machine IP: %v\n", err)
 		}
@@ -444,7 +444,7 @@ func (ipr *IPResolver) GetMachineIP() string {
 func (ipr *IPResolver) GetTunnelIP() (string, error) {
 	client := GetHTTPClient(TUNNEL_TYPE_FORCED)
 	client.Timeout = 30 * time.Second
-	ip, err := ipr.getIp(client)
+	ip, err := ipr.GetIP(client)
 	if err != nil {
 		return "", err
 	}
@@ -479,9 +479,9 @@ func (ipr *IPResolver) resolveTunnelIPMap() error {
 		if u.Host == "" {
 			ip = ipr.GetMachineIP()
 		} else {
-			client := getHTTPClientWithProxy(&u)
+			client := GetHTTPClientWithProxy(&u)
 			client.Timeout = 30 * time.Second
-			if proxyIp, err := ipr.getIp(client); err == nil {
+			if proxyIp, err := ipr.GetIP(client); err == nil {
 				ip = proxyIp
 			} else {
 				errs = append(errs, err)

@@ -14,6 +14,7 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/cache"
 	"github.com/MunifTanjim/stremthru/internal/config"
 	"github.com/MunifTanjim/stremthru/internal/logger"
+	newznab_indexer "github.com/MunifTanjim/stremthru/internal/newznab/indexer"
 	"github.com/MunifTanjim/stremthru/internal/util"
 	"golang.org/x/sync/singleflight"
 )
@@ -95,11 +96,20 @@ func RehashIfNeeded(info *NZBInfo) error {
 
 var nzbFileFetchSG singleflight.Group
 
-var nzbFileFetcher = func() *http.Client {
+var defaultNZBFileFetcher = func() *http.Client {
 	client := config.GetHTTPClient(config.TUNNEL_TYPE_NEWZ_NZB_GRAB)
 	client.Timeout = 60 * time.Second
 	return client
 }()
+
+func getNZBFileFetcher(link string) *http.Client {
+	if client, err := newznab_indexer.GetHTTPClientForURL(link); err != nil {
+		log.Error("failed to get http client for nzb file link, using default client", "error", err, "link", link)
+	} else if client != nil {
+		return client
+	}
+	return defaultNZBFileFetcher
+}
 
 type OnFetchedHook func(nzbFile *NZBFile, err error, latency time.Duration)
 
@@ -143,14 +153,10 @@ func fetchNZBFile(link string, name string, log *logger.Logger, opts *fetchOptio
 				if opts.onFetched != nil {
 					opts.onFetched(file, err, time.Since(startTime))
 				}
-			}()
-
-			defer func() {
-				if err == nil {
-					return
-				}
-				if cacheErr := nzbFetchErrCache.Add(cacheKey, err.Error()); cacheErr != nil && log != nil {
-					log.Warn("fetch nzb - failed to cache failure", "error", cacheErr, "link", clink)
+				if err != nil {
+					if cacheErr := nzbFetchErrCache.Add(cacheKey, err.Error()); cacheErr != nil && log != nil {
+						log.Warn("fetch nzb - failed to cache failure", "error", cacheErr, "link", clink)
+					}
 				}
 			}()
 
@@ -159,7 +165,7 @@ func fetchNZBFile(link string, name string, log *logger.Logger, opts *fetchOptio
 				return nil, err
 			}
 			req.Header = config.Newz.IndexerRequestHeader.Grab.Clone()
-			res, err := nzbFileFetcher.Do(req)
+			res, err := getNZBFileFetcher(link).Do(req)
 			if err != nil {
 				return nil, err
 			}
