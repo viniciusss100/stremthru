@@ -150,7 +150,7 @@ func fetchNZBFile(link string, name string, log *logger.Logger, opts *fetchOptio
 			var file *NZBFile
 
 			defer func() {
-				if opts.onFetched != nil {
+				if opts != nil && opts.onFetched != nil {
 					opts.onFetched(file, err, time.Since(startTime))
 				}
 				if err != nil {

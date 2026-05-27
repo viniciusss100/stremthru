@@ -22,6 +22,7 @@ export type NZBInfoItem = {
   files: null | NZBContentFile[];
   hash: string;
   id: string;
+  inspection_meta?: NZBInfoInspectionMeta;
   name: string;
   password: string;
   size: number;
@@ -30,6 +31,11 @@ export type NZBInfoItem = {
   updated_at: string;
   url: string;
   user: string;
+};
+
+type NZBInfoInspectionMeta = {
+  duration_ms: number;
+  error?: string;
 };
 
 export function useNzbInfo() {

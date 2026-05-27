@@ -136,22 +136,28 @@ type NZBContentFileResponse struct {
 	Volume     int                      `json:"volume,omitempty"`
 }
 
+type NZBInspectionMetaResponse struct {
+	DurationMs float64 `json:"duration_ms"`
+	Error      string  `json:"error,omitempty"`
+}
+
 type NZBResponse struct {
-	Id         string                   `json:"id"`
-	Hash       string                   `json:"hash"`
-	Name       string                   `json:"name"`
-	Size       int64                    `json:"size"`
-	FileCount  int                      `json:"file_count"`
-	Password   string                   `json:"password"`
-	URL        string                   `json:"url"`
-	Files      []NZBContentFileResponse `json:"files"`
-	Streamable bool                     `json:"streamable"`
-	Cached     bool                     `json:"cached"`
-	User       string                   `json:"user"`
-	Date       string                   `json:"date"`
-	Status     string                   `json:"status"`
-	CreatedAt  string                   `json:"created_at"`
-	UpdatedAt  string                   `json:"updated_at"`
+	Id             string                     `json:"id"`
+	Hash           string                     `json:"hash"`
+	Name           string                     `json:"name"`
+	Size           int64                      `json:"size"`
+	FileCount      int                        `json:"file_count"`
+	Password       string                     `json:"password"`
+	URL            string                     `json:"url"`
+	Files          []NZBContentFileResponse   `json:"files"`
+	Streamable     bool                       `json:"streamable"`
+	Cached         bool                       `json:"cached"`
+	User           string                     `json:"user"`
+	Date           string                     `json:"date"`
+	Status         string                     `json:"status"`
+	InspectionMeta *NZBInspectionMetaResponse `json:"inspection_meta,omitempty"`
+	CreatedAt      string                     `json:"created_at"`
+	UpdatedAt      string                     `json:"updated_at"`
 }
 
 type RequeueAllResponse struct {
@@ -195,7 +201,7 @@ func toNZBResponse(info *nzb_info.NZBInfo) NZBResponse {
 	if !info.Date.IsZero() {
 		date = info.Date.Format(time.RFC3339)
 	}
-	return NZBResponse{
+	resp := NZBResponse{
 		Id:         info.Id,
 		Hash:       info.Hash,
 		Name:       info.Name,
@@ -212,6 +218,13 @@ func toNZBResponse(info *nzb_info.NZBInfo) NZBResponse {
 		CreatedAt:  info.CAt.Format(time.RFC3339),
 		UpdatedAt:  info.UAt.Format(time.RFC3339),
 	}
+	if info.InspectionMeta.Data.DurationMs > 0 || info.InspectionMeta.Data.Error != "" {
+		resp.InspectionMeta = &NZBInspectionMetaResponse{
+			DurationMs: info.InspectionMeta.Data.DurationMs,
+			Error:      info.InspectionMeta.Data.Error,
+		}
+	}
+	return resp
 }
 
 func handleGetNZBs(w http.ResponseWriter, r *http.Request) {

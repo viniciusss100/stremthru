@@ -13,7 +13,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
-import { DateTime } from "luxon";
+import { DateTime, Duration } from "luxon";
 import prettyBytes from "pretty-bytes";
 import { ComponentProps, useState } from "react";
 import { toast } from "sonner";
@@ -84,6 +84,17 @@ function age(dateString: string): null | string {
     .toHuman({
       maximumFractionDigits: 0,
       showZeros: false,
+      unitDisplay: "short",
+    });
+}
+
+function formatDuration(ms: number): string {
+  const dur = Duration.fromMillis(ms);
+  return dur
+    .shiftTo("hours", "minutes", "seconds", "milliseconds")
+    .removeZeros()
+    .toHuman({
+      maximumFractionDigits: 2,
       unitDisplay: "short",
     });
 }
@@ -183,6 +194,19 @@ const columns: ColumnDef<NZBInfoItem>[] = [
       );
     },
     header: "Age",
+  }),
+  col.accessor("inspection_meta", {
+    cell: ({ getValue }) => {
+      const stats = getValue();
+      if (!stats?.duration_ms)
+        return <span className="text-muted-foreground">-</span>;
+      return (
+        <span className="text-muted-foreground text-xs">
+          {formatDuration(stats.duration_ms)}
+        </span>
+      );
+    },
+    header: "Inspection Time",
   }),
   col.accessor("created_at", {
     cell: ({ getValue }) => {
@@ -587,6 +611,28 @@ function NzbInfoDetailDialog({
                 </div>
                 <div className="mt-1">{item.file_count}</div>
               </div>
+              {item.inspection_meta && (
+                <>
+                  <div>
+                    <div className="text-muted-foreground font-medium">
+                      Inspect Duration
+                    </div>
+                    <div className="mt-1">
+                      {formatDuration(item.inspection_meta.duration_ms)}
+                    </div>
+                  </div>
+                  {item.inspection_meta.error && (
+                    <div className="col-span-2">
+                      <div className="text-muted-foreground font-medium">
+                        Inspect Error
+                      </div>
+                      <div className="mt-1 break-all text-xs text-red-600">
+                        {item.inspection_meta.error}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             {item.files && item.files.length > 0 && (
               <div>

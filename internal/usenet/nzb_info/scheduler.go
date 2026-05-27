@@ -110,12 +110,20 @@ var scheduler = job.NewScheduler(&job.SchedulerConfig[JobData]{
 				return err
 			}
 			inspectCtx := context.WithValue(context.Background(), usenet_pool.NZBHashContextKey, hash)
+			inspectStart := time.Now()
 			content, err := pool.InspectNZBContent(inspectCtx, nzbDoc, password)
+			durationMs := float64(time.Since(inspectStart).Microseconds()) / 1000.0
+
+			inspectionMeta := NZBInfoInspectionMeta{DurationMs: durationMs}
 			if err != nil {
+				inspectionMeta.Error = err.Error()
 				log.Warn("failed to inspect nzb content", "error", err)
-				UpdateStatus(hash, string(store.NewzStatusFailed))
+				info.InspectionMeta = db.JSONB[NZBInfoInspectionMeta]{Data: inspectionMeta}
+				info.Status = string(store.NewzStatusFailed)
+				Upsert(info)
 				return err
 			}
+			info.InspectionMeta = db.JSONB[NZBInfoInspectionMeta]{Data: inspectionMeta}
 			info.ContentFiles.Data = content.Files
 			info.Streamable = content.Streamable
 			if content.Streamable {
