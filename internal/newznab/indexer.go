@@ -159,6 +159,79 @@ func (sti stremThruIndexer) Search(q Query) ([]FeedItem, error) {
 	return allItems, nil
 }
 
+func (sti stremThruIndexer) SearchSingle(idxr *newznab_indexer.NewznabIndexer, q Query) ([]FeedItem, error) {
+	apikey, err := idxr.GetAPIKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get api key: %w", err)
+	}
+
+	rl, err := idxr.GetRateLimiter()
+	if err != nil {
+		newznab_stats.RecordSearch(idxr.Id, 0, 0, 0, err)
+		return nil, fmt.Errorf("failed to get rate limiter: %w", err)
+	}
+	if rl != nil {
+		if result, err := rl.Try(); err != nil {
+			newznab_stats.RecordSearch(idxr.Id, 0, 0, 0, err)
+			return nil, fmt.Errorf("rate limiter error: %w", err)
+		} else if !result.Allowed {
+			newznab_stats.RecordRateLimited(idxr.Id, newznab_stats.OperationSearch)
+			return nil, errors.New("rate limit exceeded")
+		}
+	}
+
+	client, err := idxr.GetClient()
+	if err != nil {
+		newznab_stats.RecordSearch(idxr.Id, 0, 0, 0, err)
+		return nil, err
+	}
+
+	var headers http.Header
+	switch {
+	case q.HasMovies():
+		headers = config.Newz.IndexerRequestHeader.Query.Get(config.NewzIndexerRequestQueryTypeMovie)
+	case q.HasTVShows():
+		headers = config.Newz.IndexerRequestHeader.Query.Get(config.NewzIndexerRequestQueryTypeTV)
+	default:
+		headers = config.Newz.IndexerRequestHeader.Query.Get(config.NewzIndexerRequestQueryTypeAny)
+	}
+
+	caps, err := client.GetCaps()
+	if err != nil {
+		newznab_stats.RecordSearch(idxr.Id, 0, 0, 0, err)
+		return nil, fmt.Errorf("failed to get capabilities: %w", err)
+	}
+
+	adjQ, err := adjustQueryForCaps(q, caps)
+	if err != nil {
+		newznab_stats.RecordSearch(idxr.Id, 0, 0, 0, err)
+		return nil, err
+	}
+
+	query := adjQ.ToValues()
+	query.Set("apikey", apikey)
+
+	items, err := newznabcache.Search.Do(idxr.Id, client, query, headers, log)
+	if err != nil {
+		return nil, err
+	}
+
+	allItems := make([]FeedItem, 0, len(items))
+	hostnames := util.NewSet[string]()
+	for _, item := range items {
+		feedItem := convertToFeedItem(item, idxr)
+		allItems = append(allItems, feedItem)
+		if u, err := url.Parse(item.DownloadLink); err == nil {
+			if h := u.Hostname(); h != "" {
+				hostnames.Add(h)
+			}
+		}
+	}
+	newznab_indexer.RecordHostnames(idxr.Id, hostnames)
+
+	return allItems, nil
+}
+
 func convertToFeedItem(n newznab_client.Newz, indexer *newznab_indexer.NewznabIndexer) FeedItem {
 	guid := strconv.FormatInt(indexer.Id, 10) + ":" + util.Base64Encode(n.DownloadLink)
 

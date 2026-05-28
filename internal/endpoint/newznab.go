@@ -5,10 +5,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/MunifTanjim/stremthru/internal/config"
 	"github.com/MunifTanjim/stremthru/internal/newznab"
+	newznab_indexer "github.com/MunifTanjim/stremthru/internal/newznab/indexer"
 	"github.com/MunifTanjim/stremthru/internal/server"
 	"github.com/MunifTanjim/stremthru/internal/shared"
 	"github.com/MunifTanjim/stremthru/internal/usenet/nzb_info"
@@ -97,6 +99,99 @@ func handleNewznab(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleNewznabByIndexer(w http.ResponseWriter, r *http.Request) {
+	indexerIDStr := r.PathValue("indexerID")
+	indexerID, err := strconv.ParseInt(indexerIDStr, 10, 64)
+	if err != nil {
+		sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter("invalid indexer id"), "xml")
+		return
+	}
+
+	t := r.URL.Query().Get("t")
+	if t == "" {
+		http.Redirect(w, r, r.URL.Path+"?t=caps", http.StatusTemporaryRedirect)
+		return
+	}
+
+	o := strings.ToLower(r.URL.Query().Get("o"))
+	if o != "" && o != "json" && o != "xml" {
+		sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter("invalid output format"), "xml")
+		return
+	}
+
+	if t != "caps" {
+		if !isNewznabRequestAuthed(r) {
+			sendZnabResponse(w, r, 200, znab.ErrorIncorrectUserCreds, o)
+			return
+		}
+	}
+
+	idxr, err := newznab_indexer.GetById(indexerID)
+	if err != nil {
+		sendZnabResponse(w, r, 200, znab.ErrorUnknownError(err.Error()), o)
+		return
+	}
+	if idxr == nil || idxr.Disabled {
+		sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter("invalid indexer id"), o)
+		return
+	}
+
+	switch t {
+	case "caps":
+		client, err := idxr.GetClient()
+		if err != nil {
+			sendZnabResponse(w, r, 200, znab.ErrorUnknownError(err.Error()), o)
+			return
+		}
+		caps, err := client.GetCaps()
+		if err != nil {
+			sendZnabResponse(w, r, 200, znab.ErrorUnknownError(err.Error()), o)
+			return
+		}
+		stCaps := newznab.StremThruIndexer.Capabilities()
+		caps.Searching = stCaps.Searching
+		caps.Categories = stCaps.Categories
+		w.Header().Set("Cache-Control", "public, max-age=7200")
+		sendZnabResponse(w, r, 200, caps, o)
+
+	case "search", "tvsearch", "movie":
+		query, err := newznab.ParseQuery(r.URL.Query())
+		if err != nil {
+			sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter(err.Error()), o)
+			return
+		}
+		items, err := newznab.StremThruIndexer.SearchSingle(idxr, query)
+		if err != nil {
+			sendZnabResponse(w, r, 200, znab.ErrorUnknownError(err.Error()), o)
+			return
+		}
+		baseURL := shared.ExtractRequestBaseURL(r).JoinPath("/v0/newznab")
+		nzbLinkQuery := url.Values{
+			"apikey": {r.URL.Query().Get("apikey")},
+			"t":      {"get"},
+		}
+		for i := range items {
+			item := &items[i]
+			link := baseURL.JoinPath("/api")
+			nzbLinkQuery.Set("id", item.GUID)
+			link.RawQuery = nzbLinkQuery.Encode()
+			item.Link = link.String()
+		}
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		sendZnabResponse(w, r, 200, newznab.Feed{
+			Info:  znab.Info{Title: idxr.Name, Description: idxr.Name},
+			Items: items,
+		}, o)
+
+	case "get":
+		handleNewznabGet(w, r, o)
+
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=7200")
+		sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter(t), o)
+	}
+}
+
 func handleNewznabGet(w http.ResponseWriter, r *http.Request, o string) {
 	log := server.GetReqCtx(r).Log
 
@@ -170,4 +265,5 @@ func AddNewznabEndpoints(mux *http.ServeMux) {
 
 	mux.HandleFunc("/v0/newznab/api", handleNewznab)
 	mux.HandleFunc("/v0/newznab/getnzb/{nzbId}", handleNewznabGetNZB)
+	mux.HandleFunc("/v0/newznab/i/{indexerID}/api", handleNewznabByIndexer)
 }

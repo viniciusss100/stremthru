@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import {
   CheckCircle,
+  CopyIcon,
   Pencil,
   Plus,
   Power,
@@ -13,6 +14,7 @@ import { DateTime } from "luxon";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfig } from "@/api/config";
 import {
   useRateLimitConfig,
   useRateLimitConfigs,
@@ -58,6 +60,7 @@ import { APIError } from "@/lib/api";
 declare module "@/components/data-table" {
   export interface DataTableMetaCtx {
     NewznabIndexer: {
+      baseUrl: string;
       onEdit: (item: NewznabIndexer) => void;
       removeIndexer: ReturnType<typeof useNewznabIndexerMutation>["remove"];
       testIndexer: ReturnType<typeof useNewznabIndexerMutation>["test"];
@@ -160,7 +163,7 @@ const columns: ColumnDef<NewznabIndexer>[] = [
   }),
   col.display({
     cell: (c) => {
-      const { onEdit, removeIndexer, testIndexer, toggleIndexer } =
+      const { baseUrl, onEdit, removeIndexer, testIndexer, toggleIndexer } =
         c.table.options.meta!.ctx;
       const item = c.row.original;
       return (
@@ -226,6 +229,22 @@ const columns: ColumnDef<NewznabIndexer>[] = [
               </Button>
             </TooltipTrigger>
             <TooltipContent>Test Connection</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={async () => {
+                  const url = `${baseUrl}/v0/newznab/i/${item.id}/api`;
+                  await navigator.clipboard.writeText(url);
+                  toast.success("Copied endpoint URL");
+                }}
+                size="icon-sm"
+                variant="ghost"
+              >
+                <CopyIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy Endpoint URL</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -450,6 +469,7 @@ export const Route = createFileRoute("/dash/usenet/indexers")({
 });
 
 function RouteComponent() {
+  const config = useConfig();
   const newznabIndexers = useNewznabIndexers();
   const {
     remove: removeIndexer,
@@ -463,6 +483,8 @@ function RouteComponent() {
     setEditItem(item);
   };
 
+  const baseUrl = config.data?.instance.base_url ?? "";
+
   const table = useDataTable({
     columns,
     data: newznabIndexers.data ?? [],
@@ -471,6 +493,7 @@ function RouteComponent() {
     },
     meta: {
       ctx: {
+        baseUrl,
         onEdit: handleEdit,
         removeIndexer,
         testIndexer,
