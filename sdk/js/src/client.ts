@@ -98,6 +98,7 @@ class StremThruStore {
         }>;
         hash: string;
         magnet: string;
+        name?: string;
         status: StoreMagnetStatus;
       }>;
     }>("/v0/store/magnets/check", {
@@ -375,6 +376,7 @@ class StremThruStoreTorz {
         }>;
         hash: string;
         magnet: string;
+        name?: string;
         status: StoreTorzStatus;
       }>;
     }>("/v0/store/torz/check", {
