@@ -3,6 +3,7 @@ package stremthru
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/cache"
 	"github.com/MunifTanjim/stremthru/internal/config"
 	"github.com/MunifTanjim/stremthru/internal/job/job_queue"
+	"github.com/MunifTanjim/stremthru/internal/newznab"
 	usenetmanager "github.com/MunifTanjim/stremthru/internal/usenet/manager"
 	"github.com/MunifTanjim/stremthru/internal/usenet/nzb_info"
 	usenet_pool "github.com/MunifTanjim/stremthru/internal/usenet/pool"
@@ -148,7 +150,27 @@ func (c *StoreClient) AddNewz(params *store.AddNewzParams) (*store.AddNewzData, 
 		return nil, err
 	}
 
-	id, err := nzb_info.QueueJob(ba.Username, "", params.Link, "", 0, "", 0)
+	link, indexerId := params.Link, int64(0)
+
+	if u, err := url.Parse(link); err != nil {
+		err := core.NewStoreError("invalid link").WithCause(err)
+		err.StoreName = string(store.StoreNameStremThru)
+		err.StatusCode = http.StatusBadRequest
+		return nil, err
+	} else if u.Host == config.BaseURL.Host {
+		nzbId := u.Query().Get("id")
+		if nzbIndexerId, nzbLink, err := newznab.StremThruIndexer.UnwrapLink(nzbId, false); err != nil {
+			err := core.NewStoreError("invalid link").WithCause(err)
+			err.StoreName = string(store.StoreNameStremThru)
+			err.StatusCode = http.StatusBadRequest
+			return nil, err
+		} else {
+			link = nzbLink.String()
+			indexerId = nzbIndexerId
+		}
+	}
+
+	id, err := nzb_info.QueueJob(ba.Username, "", link, "", 0, "", indexerId)
 	if err != nil {
 		return nil, err
 	}

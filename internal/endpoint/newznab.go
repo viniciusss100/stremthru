@@ -12,7 +12,6 @@ import (
 	"github.com/MunifTanjim/stremthru/internal/newznab"
 	newznab_indexer "github.com/MunifTanjim/stremthru/internal/newznab/indexer"
 	"github.com/MunifTanjim/stremthru/internal/server"
-	"github.com/MunifTanjim/stremthru/internal/shared"
 	"github.com/MunifTanjim/stremthru/internal/usenet/nzb_info"
 	"github.com/MunifTanjim/stremthru/internal/util"
 	"github.com/MunifTanjim/stremthru/internal/znab"
@@ -58,7 +57,7 @@ func handleNewznab(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	baseURL := shared.ExtractRequestBaseURL(r).JoinPath("/v0/newznab")
+	baseURL := config.BaseURL.JoinPath("/v0/newznab")
 
 	switch t {
 	case "search", "tvsearch", "movie":
@@ -165,7 +164,7 @@ func handleNewznabByIndexer(w http.ResponseWriter, r *http.Request) {
 			sendZnabResponse(w, r, 200, znab.ErrorUnknownError(err.Error()), o)
 			return
 		}
-		baseURL := shared.ExtractRequestBaseURL(r).JoinPath("/v0/newznab")
+		baseURL := config.BaseURL.JoinPath("/v0/newznab")
 		nzbLinkQuery := url.Values{
 			"apikey": {r.URL.Query().Get("apikey")},
 			"t":      {"get"},
@@ -201,7 +200,7 @@ func handleNewznabGet(w http.ResponseWriter, r *http.Request, o string) {
 		return
 	}
 
-	indexerId, link, err := newznab.StremThruIndexer.UnwrapLink(nzbId)
+	indexerId, link, err := newznab.StremThruIndexer.UnwrapLink(nzbId, true)
 	if err != nil {
 		sendZnabResponse(w, r, 200, znab.ErrorIncorrectParameter("invalid id"), o)
 		return

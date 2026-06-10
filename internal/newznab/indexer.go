@@ -286,7 +286,7 @@ func parseNZBId(nzbId string) (indexerId int64, downloadURL string, err error) {
 	return indexerId, downloadURL, nil
 }
 
-func (sti stremThruIndexer) UnwrapLink(id string) (int64, *url.URL, error) {
+func (sti stremThruIndexer) UnwrapLink(id string, checkRateLimit bool) (int64, *url.URL, error) {
 	indexerId, link, err := parseNZBId(id)
 	if err != nil {
 		return 0, nil, err
@@ -300,16 +300,18 @@ func (sti stremThruIndexer) UnwrapLink(id string) (int64, *url.URL, error) {
 		return indexerId, nil, errors.New("indexer not found")
 	}
 
-	rl, err := indexer.GetRateLimiter()
-	if err != nil {
-		return indexerId, nil, err
-	}
-	if rl != nil {
-		if result, err := rl.Try(); err != nil {
+	if checkRateLimit {
+		rl, err := indexer.GetRateLimiter()
+		if err != nil {
 			return indexerId, nil, err
-		} else if !result.Allowed {
-			newznab_stats.RecordRateLimited(indexerId, newznab_stats.OperationDownload)
-			return indexerId, nil, errors.New("rate limit exceeded")
+		}
+		if rl != nil {
+			if result, err := rl.Try(); err != nil {
+				return indexerId, nil, err
+			} else if !result.Allowed {
+				newznab_stats.RecordRateLimited(indexerId, newznab_stats.OperationDownload)
+				return indexerId, nil, errors.New("rate limit exceeded")
+			}
 		}
 	}
 
