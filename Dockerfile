@@ -1,6 +1,6 @@
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
 
 RUN apk add zig
 
@@ -41,6 +41,6 @@ VOLUME ["/app/data"]
 
 ENV STREMTHRU_ENV=prod
 
-EXPOSE 7006
+EXPOSE 8080
 
 ENTRYPOINT ["./stremthru"]
