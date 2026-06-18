@@ -41,6 +41,6 @@ VOLUME ["/app/data"]
 
 ENV STREMTHRU_ENV=prod
 
-EXPOSE 8080
+EXPOSE 7006
 
 ENTRYPOINT ["./stremthru"]
