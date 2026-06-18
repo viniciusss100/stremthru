@@ -1,6 +1,6 @@
 module github.com/MunifTanjim/stremthru
 
-go 1.26
+go 1.21
 
 require (
 	github.com/alitto/pond/v2 v2.5.0
